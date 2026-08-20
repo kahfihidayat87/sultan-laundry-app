@@ -1,15 +1,19 @@
 :root {
-  --bg: #12100c;
-  --panel: #17140f;
-  --border: rgba(180, 140, 40, 0.22);
-  --border-strong: rgba(201, 162, 39, 0.55);
-  --gold: #c9a227;
-  --gold-bright: #e0b93a;
+  --bg: #0d0d0c;
+  --panel: #161513;
+  --border: rgba(198, 151, 45, 0.3);
+  --border-strong: rgba(198, 151, 45, 0.65);
+  --gold: #c6972d;
+  --gold-bright: #e6b53d;
+  --teal: #007a76;
+  --teal-bright: #14b3aa;
+  --teal-dim: rgba(0, 122, 118, 0.18);
   --text: #fdf6e3;
-  --text-dim: rgba(253, 246, 227, 0.55);
-  --text-faint: rgba(201, 162, 39, 0.55);
+  --text-dim: rgba(253, 246, 227, 0.72);
+  --text-faint: rgba(198, 151, 45, 0.75);
   --amber-950: rgba(120, 70, 10, 0.25);
-  --dark-btn-text: #1a1206;
+  --dark-btn-text: #14110c;
+  --red: #e5675f;
 }
 
 * { box-sizing: border-box; }
@@ -92,12 +96,12 @@ html, body {
 
 .hero {
   border-radius: 18px;
-  background: linear-gradient(135deg, rgba(120,70,10,0.35), transparent);
+  background: linear-gradient(135deg, rgba(0,122,118,0.28), rgba(120,70,10,0.32));
   border: 1px solid var(--border-strong);
   padding: 24px;
   margin-bottom: 24px;
 }
-.hero .eyebrow { color: var(--text-faint); font-size: 14px; font-style: italic; margin: 0 0 4px; }
+.hero .eyebrow { color: var(--teal-bright); font-size: 14px; font-style: italic; margin: 0 0 4px; }
 .hero .headline { font-size: 24px; margin: 0 0 18px; }
 
 .btn-primary {
@@ -122,8 +126,8 @@ html, body {
 .btn-secondary {
   width: 100%;
   background: transparent;
-  color: var(--gold);
-  border: 1px solid var(--border-strong);
+  color: var(--teal-bright);
+  border: 1px solid rgba(20, 179, 170, 0.55);
   border-radius: 12px;
   padding: 13px;
   font-size: 15px;

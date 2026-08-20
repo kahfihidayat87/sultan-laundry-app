@@ -2,8 +2,8 @@
 // Tersambung ke backend API (lihat CONFIG.API_BASE_URL di bawah).
 
 const CONFIG = {
-  // GANTI dengan URL backend Railway Anda setelah deploy, contoh:
-  // "https://sultan-laundry-backend-production.up.railway.app"
+  // GANTI dengan URL backend Anda setelah deploy, contoh:
+  // "https://sultan-laundry-backend.vercel.app"
   API_BASE_URL: "https://sultan-laundry-backend.vercel.app",
 };
 
@@ -81,7 +81,10 @@ function persist(key, val) {
 async function api(path, { method = "GET", body, auth = true } = {}) {
   const headers = { "Content-Type": "application/json" };
   if (auth && state.token) headers.Authorization = `Bearer ${state.token}`;
-  const res = await fetch(`${CONFIG.API_BASE_URL}${path}`, {
+  // Buang trailing slash di API_BASE_URL supaya tidak dobel jadi "//api/..."
+  // (double-slash bikin Vercel redirect, dan browser blokir redirect saat preflight CORS).
+  const base = CONFIG.API_BASE_URL.replace(/\/+$/, "");
+  const res = await fetch(`${base}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
@@ -137,7 +140,10 @@ function topbar(title, opts = {}) {
   return `
   <div class="topbar">
     <button class="icon-btn" data-action="${opts.back ? `go:${opts.back}` : ""}" ${!opts.back ? "style='visibility:hidden'" : ""}>${icons.back}</button>
-    <h1 class="serif">${title}</h1>
+    <div style="display:flex;align-items:center;gap:8px">
+      <img src="icons/icon-square.png" alt="" style="width:22px;height:22px" />
+      <h1 class="serif">${title}</h1>
+    </div>
     <button class="icon-btn" data-action="${opts.cart === false ? "" : "go:cart"}">
       ${opts.cart === false ? "" : icons.bag}
       ${opts.cart !== false && state.cart.length > 0 ? `<span class="badge">${state.cart.length}</span>` : ""}
@@ -174,9 +180,9 @@ function renderScreen() {
 // ===== AUTH SCREENS =====
 function screenLogin() {
   return `
-  <div class="screen" style="padding-top:60px">
-    <p class="eyebrow serif" style="text-align:center;color:var(--text-faint)">Assalamu'alaikum</p>
-    <h1 class="serif" style="text-align:center;font-size:26px;margin:6px 0 32px">The Sultan Laundry</h1>
+  <div class="screen" style="padding-top:40px">
+    <img src="icons/logo-full.png" alt="The Sultan Laundry" style="display:block;margin:0 auto 24px;width:150px" />
+    <p class="eyebrow serif" style="text-align:center;color:var(--teal-bright)">Assalamu'alaikum</p>
     ${errorBanner()}
     <label class="field-label">Nomor WA atau Email</label>
     <input type="text" id="login-identifier" placeholder="0812xxxxxxx atau email@contoh.com" />
@@ -440,7 +446,7 @@ function screenTracking() {
     <div class="center-banner">
       <p class="small serif">Order #${state.currentOrderId}</p>
       <p class="big serif">${STAGES[status - 1] || "Menunggu Konfirmasi"}</p>
-      ${canPay ? `<p style="margin:8px 0 0;font-size:13px;color:${paid ? "#7fd88f" : "#e8c96b"}">
+      ${canPay ? `<p style="margin:8px 0 0;font-size:13px;color:${paid ? "var(--teal-bright)" : "#e8c96b"}">
         ${paid ? "Sudah dibayar" : `Tagihan: ${fmt(order.order.final_total_price)} — ${status === 4 ? "menunggu konfirmasi Anda" : "belum dibayar"}`}
       </p>` : ""}
     </div>
@@ -697,6 +703,29 @@ async function loadPaymentScreenData() {
   }
 }
 
+// Kompres & resize foto sebelum jadi base64 — penting karena backend (Vercel)
+// punya batas keras 4.5MB per request. Foto HP modern (3-8MB) dikecilkan dulu
+// ke maks lebar 1280px, kualitas JPEG 70% — hasilnya biasanya <300KB.
+function compressImage(file, maxWidth = 1280, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = () => { img.src = reader.result; };
+    reader.onerror = reject;
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -712,7 +741,7 @@ async function uploadProof() {
   if (!fileInput.files[0]) { state.errorMsg = "Pilih foto bukti pembayaran dulu."; render(); return; }
   state.loading = true; render();
   try {
-    const imageBase64 = await fileToBase64(fileInput.files[0]);
+    const imageBase64 = await compressImage(fileInput.files[0]);
     await api(`/api/orders/${state.currentOrderId}/payment-proof`, {
       method: "POST",
       body: { method: methodSelect.value, imageBase64 },

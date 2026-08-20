@@ -32,11 +32,11 @@ Buka `app.js`, baris paling atas:
 
 ```js
 const CONFIG = {
-  API_BASE_URL: "https://YOUR-BACKEND-URL.up.railway.app",
+  API_BASE_URL: "https://YOUR-BACKEND-URL.example.com",
 };
 ```
 
-Ganti dengan URL backend Anda setelah backend (`sultan-laundry-backend`) selesai di-deploy ke Railway. Tanpa ini, app tidak akan bisa login/order.
+Ganti dengan URL backend Anda setelah backend (`sultan-laundry-backend`) selesai di-deploy (lihat README backend — database di Neon.tech, aplikasi di Vercel). Tanpa ini, app tidak akan bisa login/order.
 
 ## Fitur yang Sudah Tersambung ke Backend
 
