@@ -11,13 +11,38 @@ const CONFIG = {
   ADMIN_WHATSAPP: "628117655554",
 };
 
-const DURATIONS = [
-  { id: "reguler", name: "Reguler", time: "48–72 jam", mult: 1 },
-  { id: "ekspress", name: "Ekspress", time: "24–48 jam", mult: 1.3 },
-  { id: "kilat", name: "Kilat", time: "12–24 jam", mult: 1.6 },
-  { id: "prioritas", name: "Prioritas", time: "6–12 jam", mult: 2 },
-  { id: "darurat", name: "Darurat", time: "3–6 jam", mult: 2.5 },
+// Fallback kalau master data dari backend belum sempat termuat.
+// Nilai asli & bisa diubah Admin ada di database (duration_multipliers) —
+// lihat durationsData() di bawah yang memprioritaskan data dari server.
+const FALLBACK_DURATIONS = [
+  { id: "reguler", name: "Reguler", time: "48–72 jam", mult: 1, surcharge: 0 },
+  { id: "ekspress", name: "Ekspress", time: "24–48 jam", mult: 1.3, surcharge: 5000 },
+  { id: "kilat", name: "Kilat", time: "12–24 jam", mult: 1.6, surcharge: 10000 },
+  { id: "prioritas", name: "Prioritas", time: "6–12 jam", mult: 2, surcharge: 15000 },
+  { id: "darurat", name: "Darurat", time: "3–6 jam", mult: 2.5, surcharge: 20000 },
 ];
+
+function durationsData() {
+  if (state.masterData?.durations?.length) {
+    return state.masterData.durations.map((d) => ({
+      id: d.code,
+      name: d.name,
+      time: d.time_label,
+      mult: Number(d.multiplier),
+      surcharge: Number(d.satuan_surcharge ?? 0),
+    }));
+  }
+  return FALLBACK_DURATIONS;
+}
+
+const PICKUP_SCHEDULES = ["Pagi (08.00-10.00)", "Sore (14.00-16.00)"];
+
+const BUSINESS_PROFILE = {
+  name: "The Sultan Laundry",
+  tagline: "Laundry Antar Jemput #1 di Jogja",
+  address: "Jln. Pertapan, Tegal Cerme Rt. 08, Baturetno, Banguntapan, Bantul, DI. Yogyakarta",
+  phone: "08117655554",
+};
 
 const STAGES = [
   "Menunggu Konfirmasi",
@@ -45,6 +70,7 @@ const icons = {
   shirt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.4 14.4 16 10V4a4 4 0 0 0-8 0v6l-4.4 4.4a2 2 0 0 0 0 2.83L6 19.6V22h12v-2.4l2.4-2.37a2 2 0 0 0 0-2.83Z"/></svg>',
   wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>',
   camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>',
 };
 
 // ===== State =====
@@ -60,6 +86,7 @@ const state = {
   kiloanDraft: { service: null, duration: null, perfume: null },
   address: "",
   schedule: "",
+  locationPin: null,
   currentOrderId: load("sl_current_order", null),
   currentOrder: null,
   paymentProofs: [],
@@ -128,8 +155,8 @@ async function go(screen) {
 function cartTotal() {
   return state.cart.reduce((sum, l) => {
     if (l.type === "satuan") {
-      const mult = DURATIONS.find((d) => d.id === l.duration)?.mult ?? 1;
-      return sum + l.price * l.qty * mult;
+      const surcharge = durationsData().find((d) => d.id === l.duration)?.surcharge ?? 0;
+      return sum + (l.price + surcharge) * l.qty;
     }
     return sum;
   }, 0);
@@ -164,6 +191,19 @@ function errorBanner() {
   return state.errorMsg
     ? `<div class="notice" style="border-color:#a33;color:#f3a;margin-bottom:16px">${state.errorMsg}</div>`
     : "";
+}
+
+function businessProfileCard() {
+  const waLink = `https://wa.me/62${BUSINESS_PROFILE.phone.replace(/^0/, "")}`;
+  return `
+  <div class="card" style="cursor:default;margin-top:28px;text-align:center">
+    <p class="serif" style="margin:0 0 2px;font-size:16px;color:var(--gold-bright)">${BUSINESS_PROFILE.name}</p>
+    <p style="margin:0 0 12px;font-size:12px;color:var(--teal-bright);font-style:italic">${BUSINESS_PROFILE.tagline}</p>
+    <p style="margin:0 0 8px;font-size:12px;color:var(--text-dim);line-height:1.5">${BUSINESS_PROFILE.address}</p>
+    <a href="${waLink}" target="_blank" rel="noopener" style="font-size:12px;color:var(--teal-bright);text-decoration:none">
+      ${icons.phone} WA/Telp: ${BUSINESS_PROFILE.phone}
+    </a>
+  </div>`;
 }
 
 function renderScreen() {
@@ -204,6 +244,7 @@ function screenLogin() {
     <button class="muted-link" style="width:100%;text-align:center;margin-top:16px" data-action="go:register">
       Belum punya akun? Daftar
     </button>
+    ${businessProfileCard()}
   </div>`;
 }
 
@@ -255,6 +296,7 @@ function screenHome() {
       <div class="stat-box"><p class="label">Membership</p><p class="value serif">${state.user?.membership_tier || "Reguler"}</p></div>
     </div>
     <button class="muted-link" style="margin-top:24px" data-action="do-logout">Keluar akun</button>
+    ${businessProfileCard()}
   </div>`;
 }
 
@@ -314,14 +356,17 @@ function screenSatuanDuration() {
   return `
   ${topbar("Durasi Pengerjaan", { back: "satuan-items" })}
   <div class="screen">
-    ${DURATIONS.map((d) => `
+    ${durationsData().map((d) => `
       <button class="card ${state.satuanDuration === d.id ? "selected" : ""}" data-action="pick-satuan-duration" data-id="${d.id}">
         <div class="row">
           <div class="row" style="gap:10px;justify-content:flex-start">
             <span style="color:var(--gold)">${icons.clock}</span>
             <div><p style="margin:0;font-size:14px">${d.name}</p><p style="margin:2px 0 0;font-size:12px;color:var(--text-faint)">${d.time}</p></div>
           </div>
-          ${state.satuanDuration === d.id ? `<span style="color:var(--gold)">${icons.check}</span>` : ""}
+          <div style="display:flex;align-items:center;gap:8px">
+            ${d.surcharge > 0 ? `<span style="font-size:12px;color:var(--teal-bright)">+${fmt(d.surcharge)}/pcs</span>` : `<span style="font-size:12px;color:var(--text-faint)">Tanpa tambahan</span>`}
+            ${state.satuanDuration === d.id ? `<span style="color:var(--gold)">${icons.check}</span>` : ""}
+          </div>
         </div>
       </button>`).join("")}
     ${state.satuanDuration ? `<button class="btn-primary" style="margin-top:8px" data-action="add-satuan-cart">Tambah ke Keranjang</button>` : ""}
@@ -348,7 +393,7 @@ function screenKiloanDuration() {
   return `
   ${topbar("Durasi Pengerjaan", { back: "kiloan-service" })}
   <div class="screen">
-    ${DURATIONS.map((d) => `
+    ${durationsData().map((d) => `
       <button class="card" data-action="pick-kiloan-duration" data-id="${d.id}">
         <div class="row">
           <div class="row" style="gap:10px;justify-content:flex-start">
@@ -386,13 +431,13 @@ function screenCart() {
               <span class="seal">${icons.sparkle} ${l.type === "satuan" ? "Satuan" : "Kiloan"}</span>
               <p style="margin:8px 0 0;font-size:14px;font-weight:500">${l.name}</p>
               ${l.type === "satuan"
-                ? `<p style="margin:4px 0 0;font-size:12px;color:var(--text-faint)">${l.qty} pcs · ${DURATIONS.find((d) => d.id === l.duration)?.name}</p>`
-                : `<p style="margin:4px 0 0;font-size:12px;color:var(--text-faint)">${DURATIONS.find((d) => d.id === l.duration)?.name} · ${l.perfume}</p>`}
+                ? `<p style="margin:4px 0 0;font-size:12px;color:var(--text-faint)">${l.qty} pcs · ${durationsData().find((d) => d.id === l.duration)?.name}</p>`
+                : `<p style="margin:4px 0 0;font-size:12px;color:var(--text-faint)">${durationsData().find((d) => d.id === l.duration)?.name} · ${l.perfume}</p>`}
             </div>
             <button class="icon-btn" data-action="remove-line" data-key="${l.key}">${icons.x}</button>
           </div>
           <div style="text-align:right;margin-top:8px;font-size:14px;color:#e8c96b">
-            ${l.type === "satuan" ? fmt(l.price * l.qty * (DURATIONS.find((d) => d.id === l.duration)?.mult ?? 1)) : "Menunggu penimbangan"}
+            ${l.type === "satuan" ? fmt((l.price + (durationsData().find((d) => d.id === l.duration)?.surcharge ?? 0)) * l.qty) : "Menunggu penimbangan"}
           </div>
         </div>`).join("")}
       <button class="btn-dashed" data-action="go:order-type">+ Tambah item lain</button>
@@ -414,9 +459,22 @@ function screenPickup() {
   <div class="screen">
     <label class="field-label">${icons.pin} Alamat Pickup</label>
     <textarea id="input-address" rows="3" placeholder="Contoh: Jl. Wonocatur No. 12, Banguntapan, Bantul">${state.address}</textarea>
+    <div style="height:8px"></div>
+    <button class="btn-secondary" data-action="capture-location" style="display:flex;gap:6px">
+      ${icons.pin} ${state.loading ? "Mencari lokasi..." : state.locationPin ? "Lokasi Tersimpan ✓ — Perbarui" : "Tandai Lokasi Saya (GPS)"}
+    </button>
+    ${state.locationPin ? `<p style="font-size:12px;color:var(--teal-bright);margin:6px 0 0">📍 Titik lokasi tersimpan, tim pickup akan lihat lokasi persis Anda.</p>` : `<p style="font-size:12px;color:var(--text-faint);margin:6px 0 0">Opsional, tapi sangat membantu tim pickup menemukan lokasi Anda lebih cepat.</p>`}
+
     <div style="height:16px"></div>
     <label class="field-label">${icons.clock} Jadwal Pickup</label>
-    <input type="text" id="input-schedule" placeholder="Contoh: Hari ini, 16.00 – 18.00" value="${state.schedule}" />
+    ${PICKUP_SCHEDULES.map((s) => `
+      <button class="card ${state.schedule === s ? "selected" : ""}" data-action="pick-schedule" data-value="${s}">
+        <div class="row">
+          <span style="font-size:14px">${s}</span>
+          ${state.schedule === s ? `<span style="color:var(--gold)">${icons.check}</span>` : ""}
+        </div>
+      </button>`).join("")}
+
     <div style="height:20px"></div>
     <button class="btn-primary" id="btn-continue-pickup" ${!state.address || !state.schedule ? "disabled" : ""} data-action="go:confirm">Lanjut ke Konfirmasi</button>
   </div>`;
@@ -431,7 +489,7 @@ function screenConfirm() {
       ${state.cart.map((l) => `
         <div class="row" style="font-size:14px;margin-bottom:6px">
           <span>${l.name} ${l.type === "satuan" ? `× ${l.qty}` : ""}</span>
-          <span style="color:var(--text-faint)">${l.type === "satuan" ? fmt(l.price * l.qty * (DURATIONS.find((d) => d.id === l.duration)?.mult ?? 1)) : "Estimasi menyusul"}</span>
+          <span style="color:var(--text-faint)">${l.type === "satuan" ? fmt((l.price + (durationsData().find((d) => d.id === l.duration)?.surcharge ?? 0)) * l.qty) : "Estimasi menyusul"}</span>
         </div>`).join("")}
       <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px" class="row">
         <span style="font-weight:600">Estimasi Total</span><span style="font-weight:600">${fmt(cartTotal())}${hasKiloan() ? " + kiloan" : ""}</span>
@@ -583,9 +641,7 @@ function screenDeposit() {
 function bindEvents() {
   document.querySelectorAll("[data-action]").forEach((el) => el.addEventListener("click", handleAction));
   const addrInput = document.getElementById("input-address");
-  const schedInput = document.getElementById("input-schedule");
   if (addrInput) addrInput.addEventListener("input", (e) => { state.address = e.target.value; toggleContinueBtn(); });
-  if (schedInput) schedInput.addEventListener("input", (e) => { state.schedule = e.target.value; toggleContinueBtn(); });
 }
 
 function toggleContinueBtn() {
@@ -650,6 +706,9 @@ async function handleAction(e) {
 
   if (action === "remove-line") { state.cart = state.cart.filter((l) => l.key !== el.dataset.key); render(); return; }
 
+  if (action === "pick-schedule") { state.schedule = el.dataset.value; render(); toggleContinueBtn(); return; }
+  if (action === "capture-location") return captureLocation();
+
   if (action === "submit-order") return submitOrder();
   if (action === "confirm-deviation") return confirmDeviation();
   if (action === "upload-proof") return uploadProof();
@@ -710,6 +769,31 @@ async function loadMasterData() {
 }
 
 // ===== Order actions =====
+function captureLocation() {
+  if (!navigator.geolocation) {
+    state.errorMsg = "Browser Anda tidak mendukung deteksi lokasi. Isi alamat manual saja.";
+    render();
+    return;
+  }
+  state.loading = true; render();
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude, longitude } = pos.coords;
+      state.locationPin = `https://www.google.com/maps?q=${latitude},${longitude}`;
+      state.loading = false;
+      render();
+    },
+    (err) => {
+      state.errorMsg = err.code === 1
+        ? "Izin lokasi ditolak. Aktifkan izin lokasi di pengaturan browser untuk pakai fitur ini."
+        : "Gagal mendapatkan lokasi. Coba lagi atau isi alamat manual saja.";
+      state.loading = false;
+      render();
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
 async function submitOrder() {
   state.loading = true; state.errorMsg = ""; render();
   try {
@@ -720,11 +804,11 @@ async function submitOrder() {
     );
     const data = await api("/api/orders", {
       method: "POST",
-      body: { pickupAddress: state.address, scheduledPickupTime: state.schedule, items },
+      body: { pickupAddress: state.address, pickupLocationPin: state.locationPin, scheduledPickupTime: state.schedule, items },
     });
     state.currentOrderId = data.order.id;
     persist("sl_current_order", data.order.id);
-    state.cart = []; state.address = ""; state.schedule = "";
+    state.cart = []; state.address = ""; state.schedule = ""; state.locationPin = null;
     state.loading = false;
     await go("tracking");
   } catch (err) {
