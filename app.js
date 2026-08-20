@@ -201,7 +201,7 @@ function businessProfileCard() {
     <p style="margin:0 0 12px;font-size:12px;color:var(--teal-bright);font-style:italic">${BUSINESS_PROFILE.tagline}</p>
     <p style="margin:0 0 8px;font-size:12px;color:var(--text-dim);line-height:1.5">${BUSINESS_PROFILE.address}</p>
     <a href="${waLink}" target="_blank" rel="noopener" style="font-size:12px;color:var(--teal-bright);text-decoration:none">
-      ${icons.phone} WA/Telp: ${BUSINESS_PROFILE.phone}
+      WA/Telp: ${BUSINESS_PROFILE.phone}
     </a>
   </div>`;
 }
