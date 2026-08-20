@@ -4,7 +4,7 @@
 const CONFIG = {
   // GANTI dengan URL backend Railway Anda setelah deploy, contoh:
   // "https://sultan-laundry-backend-production.up.railway.app"
-  API_BASE_URL: "https://sultan-laundry-backend.vercel.app/",
+  API_BASE_URL: "https://sultan-laundry-backend.vercel.app",
 };
 
 const DURATIONS = [
