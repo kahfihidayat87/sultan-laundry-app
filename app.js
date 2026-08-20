@@ -92,6 +92,7 @@ const state = {
   paymentProofs: [],
   depositHistory: [],
   loyaltyHistory: [],
+  myOrders: [],
   loading: false,
   errorMsg: "",
 };
@@ -146,6 +147,9 @@ async function go(screen) {
   }
   if (screen === "deposit") {
     await loadDepositScreenData();
+  }
+  if (screen === "orders") {
+    await loadMyOrders();
   }
   state.screen = screen;
   render();
@@ -223,6 +227,7 @@ function renderScreen() {
     case "tracking": return screenTracking();
     case "payment": return screenPayment();
     case "deposit": return screenDeposit();
+    case "orders": return screenOrders();
     default: return screenHome();
   }
 }
@@ -280,10 +285,14 @@ function screenHome() {
       <button class="card" data-action="go:cart">
         <div class="row"><span style="font-size:14px;color:#e8c96b">Keranjang aktif — ${state.cart.length} item</span><span style="color:var(--gold)">${icons.next}</span></div>
       </button>` : ""}
-    ${state.currentOrderId ? `
-      <button class="card" data-action="go:tracking">
-        <div class="row"><span style="font-size:14px;color:#e8c96b">Lacak Order #${state.currentOrderId}</span><span style="color:var(--gold)">${icons.next}</span></div>
-      </button>` : ""}
+    <button class="card" data-action="go:orders">
+      <div class="row" style="gap:14px;justify-content:flex-start">
+        <div class="type-icon">${icons.package}</div>
+        <div style="flex:1"><p class="serif" style="margin:0;font-size:15px">Pesanan Saya</p>
+        <p style="margin:2px 0 0;font-size:12px;color:var(--text-faint)">Pesanan aktif & riwayat</p></div>
+        <span style="color:var(--gold)">${icons.next}</span>
+      </div>
+    </button>
     <div class="stat-grid">
       <button class="stat-box" style="text-align:left;cursor:pointer" data-action="go:deposit">
         <p class="label">${icons.wallet} Saldo Deposit</p><p class="value serif">${fmt(state.user?.deposit_balance)}</p>
@@ -516,7 +525,7 @@ function screenTracking() {
   const paid = order?.order?.payment_status === "paid";
 
   return `
-  ${topbar("Lacak Pesanan", { back: "home" })}
+  ${topbar("Lacak Pesanan", { back: "orders" })}
   <div class="screen">
     <div class="center-banner">
       <p class="small serif">Order #${state.currentOrderId}</p>
@@ -637,6 +646,36 @@ function screenDeposit() {
   </div>`;
 }
 
+function screenOrders() {
+  const active = state.myOrders.filter((o) => o.status < 8);
+  const history = state.myOrders.filter((o) => o.status === 8);
+
+  const orderCard = (o) => `
+    <button class="card" data-action="open-my-order" data-id="${o.id}">
+      <div class="row" style="align-items:flex-start">
+        <div>
+          <span class="seal">${icons.sparkle} #${o.id}</span>
+          <p style="margin:8px 0 2px;font-size:14px;font-weight:500">${STAGES[o.status - 1]}</p>
+          <p style="margin:0;font-size:12px;color:var(--text-faint)">${new Date(o.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
+        </div>
+        <div style="text-align:right">
+          <p style="margin:0;font-size:14px;color:#e8c96b">${o.final_total_price !== null ? fmt(o.final_total_price) : fmt(o.estimated_total_price)}</p>
+          <span class="pill" style="font-size:10px;color:${o.payment_status === "paid" ? "var(--teal-bright)" : "var(--text-faint)"}">${o.payment_status === "paid" ? "Lunas" : "Belum bayar"}</span>
+        </div>
+      </div>
+    </button>`;
+
+  return `
+  ${topbar("Pesanan Saya", { back: "home" })}
+  <div class="screen">
+    <p class="section-title" style="font-size:13px;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 10px">Pesanan Aktif</p>
+    ${active.length === 0 ? `<p class="empty-state">Tidak ada pesanan aktif.</p>` : active.map(orderCard).join("")}
+
+    <p class="section-title" style="font-size:13px;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;margin:24px 0 10px">Riwayat Pesanan</p>
+    ${history.length === 0 ? `<p class="empty-state">Belum ada pesanan selesai.</p>` : history.map(orderCard).join("")}
+  </div>`;
+}
+
 // ===== Event binding =====
 function bindEvents() {
   document.querySelectorAll("[data-action]").forEach((el) => el.addEventListener("click", handleAction));
@@ -711,6 +750,7 @@ async function handleAction(e) {
 
   if (action === "submit-order") return submitOrder();
   if (action === "confirm-deviation") return confirmDeviation();
+  if (action === "open-my-order") return openMyOrder(Number(el.dataset.id));
   if (action === "upload-proof") return uploadProof();
 }
 
@@ -863,6 +903,22 @@ async function loadDepositScreenData() {
   } catch (err) {
     console.error(err);
   }
+}
+
+// ===== Pesanan Saya (aktif & riwayat) =====
+async function loadMyOrders() {
+  try {
+    const data = await api("/api/orders");
+    state.myOrders = data.orders;
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function openMyOrder(orderId) {
+  state.currentOrderId = orderId;
+  persist("sl_current_order", orderId);
+  await go("tracking");
 }
 
 // Kompres & resize foto sebelum jadi base64 — penting karena backend (Vercel)
