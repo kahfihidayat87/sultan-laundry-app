@@ -171,8 +171,12 @@ html, body {
 }
 
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.stat-box { border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
-.stat-box .label { color: var(--gold); font-size: 12px; margin: 0 0 4px; }
+.stat-box {
+  border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+  background: none; width: 100%; font-family: inherit; color: inherit;
+}
+.stat-box .label { color: var(--gold); font-size: 12px; margin: 0 0 4px; display: flex; align-items: center; gap: 5px; }
+.stat-box .label svg { width: 13px; height: 13px; }
 .stat-box .value { font-size: 19px; margin: 0; }
 
 .type-icon {

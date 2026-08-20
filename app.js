@@ -5,6 +5,10 @@ const CONFIG = {
   // GANTI dengan URL backend Anda setelah deploy, contoh:
   // "https://sultan-laundry-backend.vercel.app"
   API_BASE_URL: "https://sultan-laundry-backend.vercel.app",
+  // Nomor WA Admin untuk tombol "Hubungi Admin untuk Topup" di halaman Deposit.
+  // Format: kode negara tanpa "+" atau "0" di depan, mis. 62812xxxxxxx untuk 0812xxxxxxx.
+  // Kosongkan ("") kalau belum mau tampilkan tombol WA.
+  ADMIN_WHATSAPP: "628117655554",
 };
 
 const DURATIONS = [
@@ -59,6 +63,8 @@ const state = {
   currentOrderId: load("sl_current_order", null),
   currentOrder: null,
   paymentProofs: [],
+  depositHistory: [],
+  loyaltyHistory: [],
   loading: false,
   errorMsg: "",
 };
@@ -110,6 +116,9 @@ async function go(screen) {
   }
   if (screen === "payment") {
     await loadPaymentScreenData();
+  }
+  if (screen === "deposit") {
+    await loadDepositScreenData();
   }
   state.screen = screen;
   render();
@@ -173,6 +182,7 @@ function renderScreen() {
     case "confirm": return screenConfirm();
     case "tracking": return screenTracking();
     case "payment": return screenPayment();
+    case "deposit": return screenDeposit();
     default: return screenHome();
   }
 }
@@ -234,7 +244,14 @@ function screenHome() {
         <div class="row"><span style="font-size:14px;color:#e8c96b">Lacak Order #${state.currentOrderId}</span><span style="color:var(--gold)">${icons.next}</span></div>
       </button>` : ""}
     <div class="stat-grid">
-      <div class="stat-box"><p class="label">Poin Loyalitas</p><p class="value serif">${state.user?.loyalty_points ?? 0} pts</p></div>
+      <button class="stat-box" style="text-align:left;cursor:pointer" data-action="go:deposit">
+        <p class="label">${icons.wallet} Saldo Deposit</p><p class="value serif">${fmt(state.user?.deposit_balance)}</p>
+      </button>
+      <button class="stat-box" style="text-align:left;cursor:pointer" data-action="go:deposit">
+        <p class="label">Poin Loyalitas</p><p class="value serif">${state.user?.loyalty_points ?? 0} pts</p>
+      </button>
+    </div>
+    <div class="stat-grid" style="margin-top:12px">
       <div class="stat-box"><p class="label">Membership</p><p class="value serif">${state.user?.membership_tier || "Reguler"}</p></div>
     </div>
     <button class="muted-link" style="margin-top:24px" data-action="do-logout">Keluar akun</button>
@@ -518,6 +535,50 @@ function screenPayment() {
   </div>`;
 }
 
+function screenDeposit() {
+  const waNumber = CONFIG.ADMIN_WHATSAPP; // isi nomor WA Admin di CONFIG paling atas file ini
+  const waLink = waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent("Assalamu'alaikum, saya mau topup saldo deposit The Sultan Laundry.")}` : null;
+
+  return `
+  ${topbar("Deposit & Poin", { back: "home" })}
+  <div class="screen">
+    <div class="center-banner">
+      <p class="small serif">Saldo Deposit Anda</p>
+      <p class="big serif">${fmt(state.user?.deposit_balance)}</p>
+    </div>
+
+    <div class="stat-grid" style="margin-bottom:20px">
+      <div class="stat-box"><p class="label">Loyalty Point</p><p class="value serif">${state.user?.loyalty_points ?? 0} pts</p></div>
+      <div class="stat-box"><p class="label">Membership</p><p class="value serif">${state.user?.membership_tier || "Reguler"}</p></div>
+    </div>
+
+    ${waLink ? `
+    <a href="${waLink}" target="_blank" rel="noopener" class="btn-primary" style="display:flex;text-decoration:none;margin-bottom:24px">
+      ${icons.wallet} Hubungi Admin untuk Topup Deposit
+    </a>` : `
+    <div class="notice" style="margin-bottom:24px">Untuk topup saldo deposit, silakan hubungi Admin The Sultan Laundry langsung.</div>
+    `}
+
+    <p class="section-title" style="font-size:13px;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 10px">Histori Deposit</p>
+    ${state.depositHistory.length === 0 ? `<p class="empty-state">Belum ada transaksi deposit.</p>` : state.depositHistory.map((t) => `
+      <div class="row-item">
+        <span style="color:${t.type === "topup" ? "var(--teal-bright)" : "#e5675f"};font-size:14px">
+          ${t.type === "topup" ? "+" : "−"} ${fmt(t.amount)}
+        </span>
+        <span style="font-size:12px;color:var(--text-faint)">${new Date(t.timestamp).toLocaleDateString("id-ID")}</span>
+      </div>`).join("")}
+
+    <p class="section-title" style="font-size:13px;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;margin:20px 0 10px">Histori Loyalty Point</p>
+    ${state.loyaltyHistory.length === 0 ? `<p class="empty-state">Belum ada transaksi poin.</p>` : state.loyaltyHistory.map((t) => `
+      <div class="row-item">
+        <span style="color:${t.type === "earn" ? "var(--teal-bright)" : "#e5675f"};font-size:14px">
+          ${t.type === "earn" ? "+" : "−"} ${t.points} pts
+        </span>
+        <span style="font-size:12px;color:var(--text-faint)">${new Date(t.timestamp).toLocaleDateString("id-ID")}</span>
+      </div>`).join("")}
+  </div>`;
+}
+
 // ===== Event binding =====
 function bindEvents() {
   document.querySelectorAll("[data-action]").forEach((el) => el.addEventListener("click", handleAction));
@@ -698,6 +759,23 @@ async function loadPaymentScreenData() {
     state.paymentMethods = settings.paymentMethods;
     const proofs = await api(`/api/orders/${state.currentOrderId}/payment-proof`);
     state.paymentProofs = proofs.proofs;
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// ===== Deposit & Loyalty actions =====
+async function loadDepositScreenData() {
+  try {
+    const [profile, depositRes, loyaltyRes] = await Promise.all([
+      api("/api/me"),
+      api("/api/me/deposit-history"),
+      api("/api/me/loyalty-history"),
+    ]);
+    state.user = profile.user;
+    persist("sl_user", profile.user);
+    state.depositHistory = depositRes.history;
+    state.loyaltyHistory = loyaltyRes.history;
   } catch (err) {
     console.error(err);
   }
